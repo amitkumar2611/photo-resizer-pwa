@@ -3,7 +3,7 @@
 A Progressive Web App (PWA) that allows users to easily resize photos to **passport size** or any **custom dimensions**, choose a background color, and download all resized images as a ZIP — all directly in the browser, offline-ready!
 
 [👉 Try the Live Demo](https://your-username.github.io/photo-resizer-pwa/)  
-_(replace with your GitHub Pages URL)_
+_([replace with your GitHub Pages URL](https://amitkumar2611.github.io/photo-resizer-pwa/))_
 
 ---
 
