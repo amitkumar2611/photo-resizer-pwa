@@ -55,7 +55,8 @@ photo-resizer-pwa/ ├── index.html ├── manifest.json ├── servic
 
 ## 📸 Screenshots
 
-_Add your app screenshots here for better presentation!_
+![image](https://github.com/user-attachments/assets/2d325fdf-c51e-4fbc-a187-1aec9aa614a6)
+
 
 ---
 
