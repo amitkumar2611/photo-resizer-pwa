@@ -9,45 +9,50 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
       padding: 2rem 1rem;
       max-width: 900px;
       margin: auto;
-      background: linear-gradient(135deg, #e0f7fa, #ffe0f0);
+      background: linear-gradient(135deg, #e3f2fd, #fce4ec);
       color: #333;
     }
     h1 {
       text-align: center;
-      margin-bottom: 1.5rem;
       font-size: 2rem;
+      margin-bottom: 1.5rem;
     }
     input, select, button {
-      margin: 0.5rem 0.3rem;
       padding: 0.5rem 1rem;
+      font-size: 1rem;
+      margin: 0.3rem;
       border-radius: 5px;
       border: 1px solid #ccc;
-      font-size: 1rem;
     }
     button {
       cursor: pointer;
-      background-color: #2196F3;
-      color: white;
       border: none;
+      color: white;
     }
-    button:hover {
-      background-color: #1976D2;
-    }
+    .btn-blue { background-color: #2196F3; }
+    .btn-blue:hover { background-color: #1976D2; }
+    .btn-green { background-color: #4CAF50; }
+    .btn-green:hover { background-color: #388E3C; }
+    .btn-red { background-color: #f44336; }
+    .btn-red:hover { background-color: #d32f2f; }
+    .btn-purple { background-color: #9C27B0; }
+    .btn-purple:hover { background-color: #7B1FA2; }
     .control-group {
       text-align: center;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5rem;
     }
     .photo-preview {
       display: flex;
       flex-wrap: wrap;
-      gap: 1.5rem;
       justify-content: center;
+      gap: 1.5rem;
       margin-top: 2rem;
     }
     .canvas-container {
@@ -74,24 +79,38 @@
 <div class="control-group">
   <input type="file" id="upload" accept="image/*" multiple><br>
 
-  <label><input type="radio" name="size" value="passport" checked> Passport Size (600x600)</label>
+  <label><input type="radio" name="size" value="passport"> Passport Size (600x600)</label>
   <label><input type="radio" name="size" value="custom"> Custom Size</label><br>
 
-  <span id="custom-size">
-    Width: <input type="number" id="customWidth" value="400" style="width:80px;"> px
-    Height: <input type="number" id="customHeight" value="600" style="width:80px;"> px
-  </span><br>
+  <div id="custom-size">
+    Width: <input type="number" id="customWidth" placeholder="Width" style="width: 80px;">
+    px Height: <input type="number" id="customHeight" placeholder="Height" style="width: 80px;"> px
+  </div><br>
 
   <label for="bgColor">Background:</label>
   <select id="bgColor">
+    <option value="">-- Select --</option>
     <option value="white">White</option>
     <option value="red">Red</option>
     <option value="blue">Blue</option>
   </select><br>
 
-  <button onclick="resizeAll()">Resize</button>
-  <button onclick="downloadAllAsZip()" style="background-color: #4CAF50;">Download All as ZIP</button>
-  <button onclick="clearAll()" style="background-color: #f44336;">Clear All</button>
+  <label for="exportFormat">Export Format:</label>
+  <select id="exportFormat" onchange="updateFormatButton()">
+    <option value="">-- Select Format --</option>
+    <option value="png">PNG</option>
+    <option value="jpeg">JPEG</option>
+    <option value="webp">WEBP</option>
+    <option value="pdf">PDF</option>
+  </select>
+
+  <button id="downloadFormatBtn" class="btn-purple" disabled>
+    Download All in Format
+  </button><br><br>
+
+  <button onclick="resizeAll()" class="btn-blue">Resize</button>
+  <button onclick="downloadAllAsZip()" class="btn-green">Download All as ZIP</button>
+  <button onclick="clearAll()" class="btn-red">Clear All</button>
 </div>
 
 <div class="photo-preview" id="previewArea"></div>
@@ -99,32 +118,34 @@
 <script>
   const upload = document.getElementById('upload');
   const previewArea = document.getElementById('previewArea');
+  const exportFormat = document.getElementById('exportFormat');
+  const formatBtn = document.getElementById('downloadFormatBtn');
   let resizedImages = [];
 
   document.querySelectorAll('input[name="size"]').forEach(radio => {
     radio.addEventListener('change', () => {
       document.getElementById('custom-size').style.display =
-        document.querySelector('input[name="size"]:checked').value === 'custom' ? 'inline-block' : 'none';
+        document.querySelector('input[name="size"]:checked')?.value === 'custom' ? 'inline-block' : 'none';
     });
   });
 
   function resizeAll() {
     previewArea.innerHTML = '';
-    resizedImages = []; // clear previous
+    resizedImages = [];
     const files = upload.files;
     const bgColor = document.getElementById('bgColor').value;
 
-    const sizeType = document.querySelector('input[name="size"]:checked').value;
+    const sizeType = document.querySelector('input[name="size"]:checked')?.value;
     let width = 600, height = 600;
+
+    if (!sizeType) return alert("Please select a size option.");
+    if (!bgColor) return alert("Please select a background color.");
+    if (!files.length) return alert("Please upload at least one image.");
 
     if (sizeType === 'custom') {
       width = parseInt(document.getElementById('customWidth').value, 10);
       height = parseInt(document.getElementById('customHeight').value, 10);
-    }
-
-    if (!files.length) {
-      alert("Please upload at least one image.");
-      return;
+      if (!width || !height) return alert("Enter custom dimensions.");
     }
 
     Array.from(files).forEach(file => {
@@ -163,14 +184,14 @@
           ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 
           const imgURL = canvas.toDataURL('image/png');
-          resizedImages.push({ name: `resized_${file.name}`, data: imgURL });
+          resizedImages.push({ name: `resized_${file.name}`, canvas, data: imgURL });
 
           const container = document.createElement('div');
           container.className = 'canvas-container';
           container.innerHTML = `
             <canvas width="${width}" height="${height}"></canvas><br>
             <a href="${imgURL}" download="resized_${file.name}">
-              <button>Download</button>
+              <button class="btn-blue">Download</button>
             </a>
           `;
           container.querySelector('canvas').getContext('2d').drawImage(canvas, 0, 0);
@@ -186,11 +207,14 @@
     upload.value = "";
     previewArea.innerHTML = "";
     resizedImages = [];
-    document.getElementById('customWidth').value = 400;
-    document.getElementById('customHeight').value = 600;
-    document.querySelector('input[value="passport"]').checked = true;
+    exportFormat.value = "";
+    formatBtn.textContent = "Download All in Format";
+    formatBtn.disabled = true;
+    document.querySelectorAll('input[name="size"]').forEach(r => r.checked = false);
     document.getElementById('custom-size').style.display = 'none';
-    document.getElementById('bgColor').value = 'white';
+    document.getElementById('customWidth').value = '';
+    document.getElementById('customHeight').value = '';
+    document.getElementById('bgColor').value = '';
   }
 
   function downloadAllAsZip() {
@@ -208,6 +232,51 @@
     zip.generateAsync({ type: "blob" }).then(function (content) {
       saveAs(content, "resized_photos.zip");
     });
+  }
+
+  function updateFormatButton() {
+    const selected = exportFormat.value;
+    if (selected) {
+      formatBtn.textContent = `Download in ${selected.toUpperCase()} format`;
+      formatBtn.disabled = false;
+    } else {
+      formatBtn.textContent = "Download All in Format";
+      formatBtn.disabled = true;
+    }
+  }
+
+  async function downloadAllInFormat() {
+    const format = exportFormat.value;
+    if (!format || resizedImages.length === 0) {
+      alert("Please select format and resize images first.");
+      return;
+    }
+
+    if (format === 'pdf') {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+
+      resizedImages.forEach((img, index) => {
+        const imgData = img.canvas.toDataURL('image/png');
+        const width = pdf.internal.pageSize.getWidth();
+        const height = pdf.internal.pageSize.getHeight();
+        pdf.addImage(imgData, 'PNG', 0, 0, width, height);
+        if (index !== resizedImages.length - 1) pdf.addPage();
+      });
+
+      pdf.save("resized_photos.pdf");
+    } else {
+      const zip = new JSZip();
+      resizedImages.forEach((img, i) => {
+        const dataUrl = img.canvas.toDataURL(`image/${format}`);
+        const base64Data = dataUrl.split(',')[1];
+        zip.file(`resized_${i + 1}.${format}`, base64Data, { base64: true });
+      });
+
+      zip.generateAsync({ type: "blob" }).then(content => {
+        saveAs(content, `resized_photos.${format}.zip`);
+      });
+    }
   }
 </script>
 
