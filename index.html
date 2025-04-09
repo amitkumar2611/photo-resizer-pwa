@@ -2,28 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Smart Photo Resizer</title>
+  <title>📸 Smart Photo Resizer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#2196F3">
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
+    :root {
+      --toast-bg: #333;
+      --toast-color: white;
+    }
+
+    body.light {
+      --toast-bg: #eee;
+      --toast-color: #111;
+      background: linear-gradient(to right, #fdfbfb, #ebedee);
+      color: #222;
+    }
+
+    body.dark {
+      --toast-bg: #111;
+      --toast-color: #fff;
+      background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      color: #ddd;
+    }
+
     body {
       font-family: 'Segoe UI', sans-serif;
       padding: 2rem 1rem;
       max-width: 900px;
       margin: auto;
-      background: linear-gradient(135deg, #e3f2fd, #fce4ec);
-      color: #333;
+      transition: background 0.5s, color 0.5s;
     }
+
     h1 {
       text-align: center;
       font-size: 2rem;
       margin-bottom: 1.5rem;
     }
+
+    .appearance-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
     input, select, button {
       padding: 0.5rem 1rem;
       font-size: 1rem;
@@ -31,11 +54,13 @@
       border-radius: 5px;
       border: 1px solid #ccc;
     }
+
     button {
       cursor: pointer;
       border: none;
       color: white;
     }
+
     .btn-blue { background-color: #2196F3; }
     .btn-blue:hover { background-color: #1976D2; }
     .btn-green { background-color: #4CAF50; }
@@ -44,10 +69,12 @@
     .btn-red:hover { background-color: #d32f2f; }
     .btn-purple { background-color: #9C27B0; }
     .btn-purple:hover { background-color: #7B1FA2; }
+
     .control-group {
       text-align: center;
       margin-bottom: 1.5rem;
     }
+
     .photo-preview {
       display: flex;
       flex-wrap: wrap;
@@ -55,238 +82,276 @@
       gap: 1.5rem;
       margin-top: 2rem;
     }
+
     .canvas-container {
-      background: #fff;
+      background: rgba(255,255,255,0.1);
       padding: 1rem;
       border-radius: 8px;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
       text-align: center;
     }
+
     canvas {
       border: 1px solid #ccc;
       margin-bottom: 0.5rem;
       max-width: 100%;
     }
+
     #custom-size {
       display: none;
     }
+
+    .export-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 20px;
+      background-color: var(--toast-bg);
+      color: var(--toast-color);
+      border-radius: 5px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 9999;
+    }
+
+    #toast.show {
+      opacity: 1;
+    }
   </style>
 </head>
-<body>
+<body class="light">
+  <div class="appearance-toggle">
+    <span>🎨</span>
+    <label><input type="radio" name="theme" value="light" checked> Light</label>
+    <label><input type="radio" name="theme" value="dark"> Dark</label>
+    <label><input type="radio" name="theme" value="auto"> Auto</label>
+  </div>
 
-<h1>📸 Smart Photo Resizer</h1>
+  <h1>📸 Smart Photo Resizer</h1>
 
-<div class="control-group">
-  <input type="file" id="upload" accept="image/*" multiple><br>
+  <div class="control-group">
+    <input type="file" id="upload" accept="image/*" multiple><br>
 
-  <label><input type="radio" name="size" value="passport"> Passport Size (600x600)</label>
-  <label><input type="radio" name="size" value="custom"> Custom Size</label><br>
+    <label><input type="radio" name="size" value="passport"> Passport Size (600x600)</label>
+    <label><input type="radio" name="size" value="custom"> Custom Size</label><br>
 
-  <div id="custom-size">
-    Width: <input type="number" id="customWidth" placeholder="Width" style="width: 80px;">
-    px Height: <input type="number" id="customHeight" placeholder="Height" style="width: 80px;"> px
-  </div><br>
+    <div id="custom-size">
+      Width: <input type="number" id="customWidth" placeholder="Width" style="width: 80px;">
+      px Height: <input type="number" id="customHeight" placeholder="Height" style="width: 80px;"> px
+    </div><br>
 
-  <label for="bgColor">Background:</label>
-  <select id="bgColor">
-    <option value="">-- Select --</option>
-    <option value="white">White</option>
-    <option value="red">Red</option>
-    <option value="blue">Blue</option>
-  </select><br>
+    <div class="export-controls">
+      <label for="exportFormat">Export Format:</label>
+      <select id="exportFormat" onchange="updateFormatButton()">
+        <option value="">-- Select Format --</option>
+        <option value="png">PNG</option>
+        <option value="jpeg">JPEG</option>
+        <option value="webp">WEBP</option>
+        <option value="pdf">PDF</option>
+      </select>
 
-  <label for="exportFormat">Export Format:</label>
-  <select id="exportFormat" onchange="updateFormatButton()">
-    <option value="">-- Select Format --</option>
-    <option value="png">PNG</option>
-    <option value="jpeg">JPEG</option>
-    <option value="webp">WEBP</option>
-    <option value="pdf">PDF</option>
-  </select>
+      <button id="downloadFormatBtn" class="btn-purple" onclick="downloadAllInFormat()">
+        Download All in Format
+      </button>
+    </div><br>
 
-  <button id="downloadFormatBtn" class="btn-purple" disabled>
-    Download All in Format
-  </button><br><br>
+    <div>
+      <button onclick="resizeAll()" class="btn-blue">Resize</button>
+      <button onclick="downloadAllAsZip()" class="btn-green">Download All as ZIP</button>
+      <button onclick="clearAll()" class="btn-red">Clear All</button>
+    </div>
+  </div>
 
-  <button onclick="resizeAll()" class="btn-blue">Resize</button>
-  <button onclick="downloadAllAsZip()" class="btn-green">Download All as ZIP</button>
-  <button onclick="clearAll()" class="btn-red">Clear All</button>
-</div>
+  <div class="photo-preview" id="previewArea"></div>
 
-<div class="photo-preview" id="previewArea"></div>
+  <div id="toast"></div>
 
-<script>
-  const upload = document.getElementById('upload');
-  const previewArea = document.getElementById('previewArea');
-  const exportFormat = document.getElementById('exportFormat');
-  const formatBtn = document.getElementById('downloadFormatBtn');
-  let resizedImages = [];
+  <script>
+    const upload = document.getElementById('upload');
+    const previewArea = document.getElementById('previewArea');
+    const exportFormat = document.getElementById('exportFormat');
+    const formatBtn = document.getElementById('downloadFormatBtn');
+    const toast = document.getElementById('toast');
+    let resizedImages = [];
 
-  document.querySelectorAll('input[name="size"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      document.getElementById('custom-size').style.display =
-        document.querySelector('input[name="size"]:checked')?.value === 'custom' ? 'inline-block' : 'none';
-    });
-  });
-
-  function resizeAll() {
-    previewArea.innerHTML = '';
-    resizedImages = [];
-    const files = upload.files;
-    const bgColor = document.getElementById('bgColor').value;
-
-    const sizeType = document.querySelector('input[name="size"]:checked')?.value;
-    let width = 600, height = 600;
-
-    if (!sizeType) return alert("Please select a size option.");
-    if (!bgColor) return alert("Please select a background color.");
-    if (!files.length) return alert("Please upload at least one image.");
-
-    if (sizeType === 'custom') {
-      width = parseInt(document.getElementById('customWidth').value, 10);
-      height = parseInt(document.getElementById('customHeight').value, 10);
-      if (!width || !height) return alert("Enter custom dimensions.");
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 3000);
     }
 
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const img = new Image();
-        img.onload = function () {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          canvas.width = width;
-          canvas.height = height;
-
-          ctx.fillStyle = bgColor;
-          ctx.fillRect(0, 0, width, height);
-
-          const aspectRatio = img.width / img.height;
-          let drawWidth = width, drawHeight = height;
-
-          if (img.width > img.height) {
-            drawHeight = width / aspectRatio;
-            if (drawHeight > height) {
-              drawHeight = height;
-              drawWidth = height * aspectRatio;
-            }
-          } else {
-            drawWidth = height * aspectRatio;
-            if (drawWidth > width) {
-              drawWidth = width;
-              drawHeight = width / aspectRatio;
-            }
-          }
-
-          const offsetX = (width - drawWidth) / 2;
-          const offsetY = (height - drawHeight) / 2;
-
-          ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-
-          const imgURL = canvas.toDataURL('image/png');
-          resizedImages.push({ name: `resized_${file.name}`, canvas, data: imgURL });
-
-          const container = document.createElement('div');
-          container.className = 'canvas-container';
-          container.innerHTML = `
-            <canvas width="${width}" height="${height}"></canvas><br>
-            <a href="${imgURL}" download="resized_${file.name}">
-              <button class="btn-blue">Download</button>
-            </a>
-          `;
-          container.querySelector('canvas').getContext('2d').drawImage(canvas, 0, 0);
-          previewArea.appendChild(container);
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function clearAll() {
-    upload.value = "";
-    previewArea.innerHTML = "";
-    resizedImages = [];
-    exportFormat.value = "";
-    formatBtn.textContent = "Download All in Format";
-    formatBtn.disabled = true;
-    document.querySelectorAll('input[name="size"]').forEach(r => r.checked = false);
-    document.getElementById('custom-size').style.display = 'none';
-    document.getElementById('customWidth').value = '';
-    document.getElementById('customHeight').value = '';
-    document.getElementById('bgColor').value = '';
-  }
-
-  function downloadAllAsZip() {
-    if (resizedImages.length === 0) {
-      alert("No resized images to download. Please resize first.");
-      return;
-    }
-
-    const zip = new JSZip();
-    resizedImages.forEach(img => {
-      const base64Data = img.data.split(',')[1];
-      zip.file(img.name, base64Data, { base64: true });
-    });
-
-    zip.generateAsync({ type: "blob" }).then(function (content) {
-      saveAs(content, "resized_photos.zip");
-    });
-  }
-
-  function updateFormatButton() {
-    const selected = exportFormat.value;
-    if (selected) {
-      formatBtn.textContent = `Download in ${selected.toUpperCase()} format`;
-      formatBtn.disabled = false;
-    } else {
-      formatBtn.textContent = "Download All in Format";
-      formatBtn.disabled = true;
-    }
-  }
-
-  async function downloadAllInFormat() {
-    const format = exportFormat.value;
-    if (!format || resizedImages.length === 0) {
-      alert("Please select format and resize images first.");
-      return;
-    }
-
-    if (format === 'pdf') {
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF();
-
-      resizedImages.forEach((img, index) => {
-        const imgData = img.canvas.toDataURL('image/png');
-        const width = pdf.internal.pageSize.getWidth();
-        const height = pdf.internal.pageSize.getHeight();
-        pdf.addImage(imgData, 'PNG', 0, 0, width, height);
-        if (index !== resizedImages.length - 1) pdf.addPage();
+    document.querySelectorAll('input[name="theme"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const theme = document.querySelector('input[name="theme"]:checked').value;
+        if (theme === 'auto') {
+          const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.body.className = isDark ? 'dark' : 'light';
+        } else {
+          document.body.className = theme;
+        }
       });
+    });
 
-      pdf.save("resized_photos.pdf");
-    } else {
+    document.querySelectorAll('input[name="size"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        document.getElementById('custom-size').style.display =
+          document.querySelector('input[name="size"]:checked')?.value === 'custom' ? 'inline-block' : 'none';
+      });
+    });
+
+    function updateFormatButton() {
+      const selected = exportFormat.value;
+      formatBtn.textContent = selected ? `Download in ${selected.toUpperCase()} format` : "Download All in Format";
+    }
+
+    function clearAll() {
+      upload.value = "";
+      previewArea.innerHTML = "";
+      resizedImages = [];
+      exportFormat.value = "";
+      formatBtn.textContent = "Download All in Format";
+      document.querySelectorAll('input[name="size"]').forEach(r => r.checked = false);
+      document.getElementById('custom-size').style.display = 'none';
+      document.getElementById('customWidth').value = '';
+      document.getElementById('customHeight').value = '';
+    }
+
+    function resizeAll() {
+      const files = upload.files;
+      if (!files.length) return showToast("Please upload at least one image.");
+
+      const sizeType = document.querySelector('input[name="size"]:checked')?.value;
+      if (!sizeType) return showToast("Please select a size option.");
+
+      let width = 600, height = 600;
+      if (sizeType === 'custom') {
+        width = parseInt(document.getElementById('customWidth').value, 10);
+        height = parseInt(document.getElementById('customHeight').value, 10);
+        if (!width || !height) return showToast("Enter custom dimensions.");
+      }
+
+      previewArea.innerHTML = '';
+      resizedImages = [];
+
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const img = new Image();
+          img.onload = function () {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = width;
+            canvas.height = height;
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(0, 0, width, height);
+
+            const aspectRatio = img.width / img.height;
+            let drawWidth = width, drawHeight = height;
+            if (img.width > img.height) {
+              drawHeight = width / aspectRatio;
+              if (drawHeight > height) {
+                drawHeight = height;
+                drawWidth = height * aspectRatio;
+              }
+            } else {
+              drawWidth = height * aspectRatio;
+              if (drawWidth > width) {
+                drawWidth = width;
+                drawHeight = width / aspectRatio;
+              }
+            }
+
+            const offsetX = (width - drawWidth) / 2;
+            const offsetY = (height - drawHeight) / 2;
+            ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+            const imgURL = canvas.toDataURL('image/png');
+            resizedImages.push({ name: `resized_${file.name}`, canvas, data: imgURL });
+
+            const container = document.createElement('div');
+            container.className = 'canvas-container';
+            container.innerHTML = `
+              <canvas width="${width}" height="${height}"></canvas><br>
+              <a href="${imgURL}" download="resized_${file.name}">
+                <button class="btn-blue">Download</button>
+              </a>
+            `;
+            container.querySelector('canvas').getContext('2d').drawImage(canvas, 0, 0);
+            previewArea.appendChild(container);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function downloadAllAsZip() {
+      if (resizedImages.length === 0) {
+        return showToast("No resized images to download. Please resize first.");
+      }
+
       const zip = new JSZip();
-      resizedImages.forEach((img, i) => {
-        const dataUrl = img.canvas.toDataURL(`image/${format}`);
-        const base64Data = dataUrl.split(',')[1];
-        zip.file(`resized_${i + 1}.${format}`, base64Data, { base64: true });
+      resizedImages.forEach(img => {
+        const base64Data = img.data.split(',')[1];
+        zip.file(img.name, base64Data, { base64: true });
       });
 
       zip.generateAsync({ type: "blob" }).then(content => {
-        saveAs(content, `resized_photos.${format}.zip`);
+        saveAs(content, "resized_photos.zip");
       });
     }
-  }
-</script>
 
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js')
-      .then(reg => console.log('✅ Service Worker registered!', reg))
-      .catch(err => console.error('⚠️ Service Worker failed:', err));
-  }
-</script>
+    function downloadAllInFormat() {
+      const format = exportFormat.value;
+      if (!format) {
+        showToast("Please select a format before downloading.");
+        return;
+      }
 
+      if (resizedImages.length === 0) {
+        showToast("Please resize images first.");
+        return;
+      }
+
+      if (format === 'pdf') {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+
+        resizedImages.forEach((img, index) => {
+          const imgData = img.canvas.toDataURL('image/png');
+          const width = pdf.internal.pageSize.getWidth();
+          const height = pdf.internal.pageSize.getHeight();
+          pdf.addImage(imgData, 'PNG', 0, 0, width, height);
+          if (index !== resizedImages.length - 1) pdf.addPage();
+        });
+
+        pdf.save("resized_photos.pdf");
+      } else {
+        const zip = new JSZip();
+        resizedImages.forEach((img, i) => {
+          const dataUrl = img.canvas.toDataURL(`image/${format}`);
+          const base64Data = dataUrl.split(',')[1];
+          zip.file(`resized_${i + 1}.${format}`, base64Data, { base64: true });
+        });
+
+        zip.generateAsync({ type: "blob" }).then(content => {
+          saveAs(content, `resized_photos.${format}.zip`);
+        });
+      }
+    }
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </body>
 </html>
